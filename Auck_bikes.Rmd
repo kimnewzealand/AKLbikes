@@ -1,15 +1,17 @@
 ---
 title: "Auckland Bike Counter Analysis"
 author: "kimnewzealand"
-date: "26 September 2018"
+date: "15 October 2018"
 output: html_document
 ---
 
 ## Introduction
 
-Auckland Transport publishes daily and monthly bike count data from counters around Auckland.
+The motivations for cycling around town can be for fitness, economic or environmental reasons. However in Auckland the weather and [the 53 odd volcanoes](https://en.wikipedia.org/wiki/Auckland_volcanic_field) could be deterrents to would-be cyclists.
 
-We will analyse and visualise this data, then fit a model to forecast the bike counts.
+Auckland Transport (AT) publishes daily and monthly bike count data from counters around Auckland.
+
+We will analyse and visualise this data, then fit a model to forecast Auckland bike activity and trends to see if cyclists are braving the weather and taking on the hills.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -49,7 +51,8 @@ url <- "https://at.govt.nz/media/1977986/august2018akldcyclecounterdata.csv"
 bikes_daily <- read_csv(url)
 # Import the bikes mounthly counter dataset. Set the counter variables types to numeric
 url2 <-"https://at.govt.nz/media/1975708/monthlyakldcyclecountdatanov2010-dec2017.csv"
-bikes_monthly <- read_csv(url2,col_types = cols(.default = col_number(),Month=col_character()))
+bikes_monthly <- read_csv(url2, 
+                          col_types = cols(.default = col_number(), Month=col_character()))
 ```
 
 **Data Summaries**
@@ -71,7 +74,7 @@ The `bikes_daily` dataset has the following variables in wide format:
 **Date** : daily from `r bikes_daily[1,1]`  
 **Bike counter street location names** : `r dim(bikes_daily)[2]-1` locations  
 
-It seems like the last row is full off N/A ie the 1 missing across all names, so we can remove this row in the cleaning step.
+It seems like the last row consists of NAs, so we can remove this row in the cleaning step.
 
 ```{r skim bikes_monthly}
 # Produce a skim summary excluding the histograms as these do not plot in R markdown currently
@@ -81,17 +84,17 @@ skim(bikes_monthly)
 The `bikes_monthly` dataset has the following variables in wide format:  
 
 **Date** : monthly from `r bikes_monthly$Month[2]`  
-**Bike counter street location Names** : `r dim(bikes_monthly)[2]-1` locations.
+**Bike counter street location Names** : `r dim(bikes_monthly)[2]-1` locations
 
 There are missing values as NA's to be considered in data aggregations.
 
 **Auckland Population Data**
 
-Population estimates for regional council, territorial authority (including Auckland local board), area unit, and urban areas is available from [DataHub table viewer](http://nzdotstat.stats.govt.nz/wbos/index.aspx). In order to download the data, a request needs to be submitted online. As an interim workaround, a manual dataframe is created based on the online query.
+Population estimates for regional council, territorial authority (including Auckland local board), area unit, and urban areas is available from [DataHub table viewer](http://nzdotstat.stats.govt.nz/wbos/index.aspx). In order to download the data, a request needs to be submitted online but the Stats NZ link doesn't currently work. As an interim workaround, a manual dataframe is created based on the online query results.
 
 ```{r create auckland pop dataset}
 # Create Auckland population dataset
-population <- data.frame(Date= c("30-June-11","30-June-12","30-June-13","30-June-14","30-June-15",         "30-June-16","30-June-17"),Auckland=	c(1459600,	1476500,1493200   ,1526900,1569900,	1614500   ,	1657200   ))
+population <- data.frame(Date= c("30-June-11","30-June-12","30-June-13","30-June-14","30-June-15",         "30-June-16","30-June-17"), Auckland = c(1459600, 1476500, 1493200, 1526900, 1569900, 1614500, 1657200   ))
 ```
 
 
@@ -103,7 +106,7 @@ The `bikes_daily` and `bikes_monthly` counter data do not have coordinates avail
 - Quay_Street  
 - Grafton_Gully  
 
-Feedback has been sent to AT to add the longitude and latitude coordinates to their csv files, so that further mapping and joins with other data can be performed.
+Feedback has been sent to AT to add the longitude and latitude coordinates to their csv files, so that further mapping and joins with other data can be performed another time.
 
 ```{r create streets coords}
 # Create a streets datafarme
@@ -122,10 +125,20 @@ bikes_daily <- bikes_daily %>%
       # Remove the last row with NAs in the dataframe using slice using this tip https://stackoverflow.com/questions/38916660/r-delete-last-row-in-dataframe-for-each-group
       slice(-n())
 
+# View the column names by position in bikes_daily to check they are the 3 points we have selected
+names(bikes_daily)[4]
+names(bikes_daily)[9]
+names(bikes_daily)[29]
+
 # Rename the 3 points in bikes_daily to match the streets points
 names(bikes_daily)[4] <- streets[1,1]
 names(bikes_daily)[9] <- streets[2,1]
 names(bikes_daily)[29] <- streets[3,1]
+
+# View the column names by position in bikes_monthly to check they are the 3 points we have selected
+names(bikes_monthly)[5]
+names(bikes_monthly)[11]
+names(bikes_monthly)[32]
 
 # Rename the 3 points in bikes_monthly to match the streets points
 names(bikes_monthly)[5] <- streets[1,1]
@@ -146,7 +159,8 @@ bikes_subset <- bikes_daily %>%
 # Now convert this dataframe into a tidy dataset using gather, where the Key is the street and the value is the count http://garrettgman.github.io/tidying/
 bikes_subset <- bikes_subset %>% 
       gather(key = "street", value="counts",1:3)
-# Now join the streets coordinates and the bikes subset dataframe using dplyr inner_join      
+
+# Now join the streets coordinates and the bikes subset dataframe using dplyr function inner_join    
 bikes_streets <- streets %>%
       inner_join(bikes_subset,by = "street")
 ```
@@ -200,7 +214,9 @@ ggplot(bikes_streets,aes(Date,counts))+
 ```
 
   
-Create a ggplot of the total aggregated count by weekday and street.
+It seems like there is a downward trend for August, perhaps this is related to the winter weather in August?
+  
+Next create a ggplot of the total aggregated count by weekday and street.
 
 ```{r weekdays bar plots}
 # Create a gpplot of the total aggregated count by weekday and street
@@ -220,7 +236,8 @@ bikes_streets %>%
       labs(caption = "Source: AT https://at.govt.nz/cycling-walking/research-monitoring/")
 ```
 
-It seems like there is a downward trend for August, perhaps this is related to the weather in August.
+Weekdays notably Thursday appears to be the most popular day in Grafton Gully and Quay Street, but Sunday appears the most popular day for cycling in Curran Street.
+
 
 **Bike Counter Locations Monthly Aggregated Data**
 
@@ -236,7 +253,7 @@ decomp <- decompose(bikes_monthly_ts)
 autoplot(decomp)
 ```
 
-From the decomposed components it appears there is a repetitive seasonality pattern and an upwards trend.
+From the decomposed components it appears there is a repetitive seasonality pattern dipping in winter months and an overall upwards trend.
 
 ```{r pop and bike plots}
 # Plot the Auckland population
@@ -264,6 +281,10 @@ plot_grid(bike_plot,pop_plot, labels = "AUTO")
 # save_plot("cowplot.png", p, ncol = 2)
 ```
 
+
+The cycling trend in A looks remarkably similar to Auckland population growth in B?!? Are more people cycling regardless of the hilly roads ?
+
+
 Finally create an arima model using the auto.arima function from the [forecast](https://cran.r-project.org/web/packages/forecast/index.html) R package.
 
 ```{r fit arima model}
@@ -286,3 +307,7 @@ fit %>%
 ```
 
 This model is a [seasonal](http://people.duke.edu/~rnau/seasarim.htm) Arima model. The moving average model has  p=0 autoregressive terms, d=1 , q=1 moving average terms, where d=1 ie differencing of order 1. The seasonal part of the model has P=2 seasonal autoregressive (SAR) terms, D=1 number of seasonal differences, Q=0 seasonal moving average (SMA) terms.
+
+## Conclusion
+
+The bike count data is interesting data to look at, especially the time series components forecasting model. Once the coordinates are available further comparisons could be made because the locations and over time.
